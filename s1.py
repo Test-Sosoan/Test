@@ -98,7 +98,7 @@ async def stripe_1d(text):
         }
 
         data = {
-            'data': f'__fluent_form_embded_post_id=1096&_fluentform_5_fluentformnonce=c20becbcc7&_wp_http_referer=%2Fpatient-payment-form%2F&input_text=Sai%20Lauo&email=saiwonelurn7%40gmail.com&input_text_1=Gop%20Fuo&dropdown=Sober%20Living&address_1%5Baddress_line_1%5D=127%20Allen%20St&address_1%5Bcity%5D=New%20York&address_1%5Bstate%5D=New%20York&address_1%5Bzip%5D=10080&address_1%5Bcountry%5D=US&custom-payment-amount=0.5&payment_method=stripe&__entry_intermediate_hash=a58bbd392f97fcf699e52e1ad05c773f&__stripe_payment_method_id='{payment_method_id}',
+            'data': f'__fluent_form_embded_post_id=1096&_fluentform_5_fluentformnonce=c20becbcc7&_wp_http_referer=%2Fpatient-payment-form%2F&input_text=Sai%20Lauo&email=saiwonelurn7%40gmail.com&input_text_1=Gop%20Fuo&dropdown=Sober%20Living&address_1%5Baddress_line_1%5D=127%20Allen%20St&address_1%5Bcity%5D=New%20York&address_1%5Bstate%5D=New%20York&address_1%5Bzip%5D=10080&address_1%5Bcountry%5D=US&custom-payment-amount=0.5&payment_method=stripe&__entry_intermediate_hash=a58bbd392f97fcf699e52e1ad05c773f&__stripe_payment_method_id={payment_method_id}',
     'action': 'fluentform_submit',
     'form_id': '5',
         }
