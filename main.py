@@ -7,16 +7,32 @@ import time
 import asyncio
 import re
 from url import check_url
+from s1 import stripe_1d
+from database import get_user_role, is_user_registered, add_user
 
 API_TOKEN = os.environ.get('TELEGRAM_BOT_TOKEN')
 bot = telebot.TeleBot(API_TOKEN)
 app = Flask(__name__)
 
-# Simple user registration system
-registered_users = set()
+# Rate limiting system
+user_last_command = {}
 
-def is_registered(user_id):
-    return user_id in registered_users
+def is_rate_limited(user_id):
+    current_time = time.time()
+    if user_id in user_last_command:
+        if current_time - user_last_command[user_id] < 5:  # 5 seconds cooldown
+            return True
+    user_last_command[user_id] = current_time
+    return False
+
+def has_permission(user_id, permission_type):
+    user_role = get_user_role(user_id)
+    
+    if permission_type == "owner":
+        return user_role == "owner"
+    elif permission_type == "premium":
+        return user_role in ["premium", "owner"]
+    return False
 
 # UptimeRobot အတွက် root endpoint
 @app.route('/')
@@ -25,19 +41,48 @@ def home():
 
 @bot.message_handler(commands=['help', 'start'])
 def send_welcome(message):
+    user_id = message.from_user.id
+    if not is_user_registered(user_id):
+        add_user(user_id, 'user')  # Auto-register new users as regular users
+    
     bot.reply_to(message, "Hi there, I am EchoBot")
 
 @bot.message_handler(commands=['register'])
 def register_user(message):
     user_id = message.from_user.id
-    registered_users.add(user_id)
-    bot.reply_to(message, "You are now registered.")
+    if not is_user_registered(user_id):
+        add_user(user_id, 'user')
+        bot.reply_to(message, "You are now registered as a regular user.")
+    else:
+        bot.reply_to(message, "You are already registered.")
+
+# Admin command to promote users
+@bot.message_handler(commands=['promote'])
+def promote_user(message):
+    user_id = message.from_user.id
+    if not has_permission(user_id, "owner"):
+        bot.reply_to(message, "You don't have permission to use this command.")
+        return
+    
+    try:
+        # Extract target user ID from command
+        target_user_id = int(message.text.split()[1])
+        new_role = message.text.split()[2].lower()
+        
+        if new_role not in ['user', 'premium', 'owner']:
+            bot.reply_to(message, "Invalid role. Use: user, premium, or owner")
+            return
+            
+        add_user(target_user_id, new_role)
+        bot.reply_to(message, f"User {target_user_id} has been promoted to {new_role}.")
+    except (IndexError, ValueError):
+        bot.reply_to(message, "Usage: /promote <user_id> <role>")
 
 # URL checking command
 @bot.message_handler(commands=['url'])
 def send_url(message):
     user_id = message.from_user.id
-    if not is_registered(user_id):
+    if not is_user_registered(user_id):
         bot.reply_to(message, "You must register first by sending `/register`.")
         return
 
@@ -48,7 +93,6 @@ def send_url(message):
 
     bot0 = bot.reply_to(message, "Please wait... ⏳")
     
-    # Run async function in a separate thread
     def run_async():
         try:
             result = asyncio.run(check_url(url))
@@ -58,6 +102,34 @@ def send_url(message):
     
     thread = threading.Thread(target=run_async)
     thread.start()
+
+# Stripe checking command
+@bot.message_handler(commands=['chk'])
+def send_stripe(message):
+    user_id = message.from_user.id
+    if not has_permission(user_id, "premium"):
+        bot.reply_to(message, "You do not have permission to use this command. Only Premium or Owner roles can access this feature.")
+        return
+    
+    if is_rate_limited(user_id):
+        bot.reply_to(message, "You are sending messages too fast. Please slow down.")
+        return
+    
+    bot0 = bot.reply_to(message, "Checking your card...")
+    card_details = message.text[len('/chk '):].strip()
+    
+    if card_details:
+        def run_async_stripe():
+            try:
+                result = asyncio.run(stripe_1d(card_details))
+                bot.edit_message_text(result, chat_id=bot0.chat.id, message_id=bot0.message_id)
+            except Exception as e:
+                bot.edit_message_text(f"Error: {e}", chat_id=bot0.chat.id, message_id=bot0.message_id)
+        
+        thread = threading.Thread(target=run_async_stripe)
+        thread.start()
+    else:
+        bot.edit_message_text("Usage: /chk {card_details}", chat_id=bot0.chat.id, message_id=bot0.message_id)
 
 # Webhook route for Telegram
 @app.route('/webhook', methods=['POST'])
@@ -73,13 +145,12 @@ def webhook():
 # Keep-alive function for UptimeRobot
 def keep_alive():
     while True:
-        # Ping own URL every 10 minutes to prevent sleep
         try:
             import requests
             requests.get("https://your-bot-name.onrender.com")
         except:
             pass
-        time.sleep(600)  # 10 minutes
+        time.sleep(600)
 
 if __name__ == '__main__':
     # Start keep-alive thread
