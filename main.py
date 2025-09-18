@@ -45,7 +45,32 @@ def send_welcome(message):
     if not is_user_registered(user_id):
         add_user(user_id, 'user')  # Auto-register new users as regular users
     
-    bot.reply_to(message, "Hi there, I am EchoBot")
+    # Create help message based on user role
+    help_text = "👋 Welcome to EchoBot!\n\nAvailable commands:\n"
+    help_text += "/help - Show this help message\n"
+    help_text += "/id - Show your user ID and role\n"
+    help_text += "/register - Register as a user\n"
+    help_text += "/url <url> - Check a URL\n"
+    
+    # Add premium commands if user has premium access
+    if has_permission(user_id, "premium"):
+        help_text += "/chk <card_details> - Check card details (Premium only)\n"
+    
+    # Add admin commands if user is owner
+    if has_permission(user_id, "owner"):
+        help_text += "/promote <user_id> <role> - Promote a user (Owner only)\n"
+    
+    bot.reply_to(message, help_text)
+
+# Add this new command handler for /id
+@bot.message_handler(commands=['id'])
+def show_user_id(message):
+    user_id = message.from_user.id
+    if not is_user_registered(user_id):
+        add_user(user_id, 'user')
+    
+    user_role = get_user_role(user_id)
+    bot.reply_to(message, f"👤 Your User ID: {user_id}\n🎭 Your Role: {user_role}")
 
 @bot.message_handler(commands=['register'])
 def register_user(message):
